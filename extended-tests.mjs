@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {deflateRawSync} from 'node:zlib';
+import {inspectZip,parseManifest} from './archive.js';
+import {category,counts} from './ui-logic.js';
+const u16=n=>{const b=Buffer.alloc(2);b.writeUInt16LE(n);return b},u32=n=>{const b=Buffer.alloc(4);b.writeUInt32LE(n>>>0);return b};
+function zip(name,text,{method=8,encrypted=false,badCRC=false}={}){const body=Buffer.from(text),compressed=method===8?deflateRawSync(body):body,n=Buffer.from(name);let c=0xffffffff;for(const byte of body){c^=byte;for(let i=0;i<8;i++)c=c&1?0xedb88320^(c>>>1):c>>>1}c=(c^0xffffffff)>>>0;if(badCRC)c^=1;const local=Buffer.concat([u32(0x04034b50),u16(20),u16(encrypted?1:0),u16(method),u32(0),u32(c),u32(compressed.length),u32(body.length),u16(n.length),u16(0),n,compressed]);const dir=Buffer.concat([u32(0x02014b50),u16(20),u16(20),u16(encrypted?1:0),u16(method),u32(0),u32(c),u32(compressed.length),u32(body.length),u16(n.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(0),n]);return new Blob([local,dir,u32(0x06054b50),u16(0),u16(0),u16(1),u16(1),u32(dir.length),u32(local.length),u16(0)])}
+const strings=['manifest','package','com.example.test','versionName','1.0','uses-permission','name','android.permission.CAMERA'];const chunks=strings.map(s=>Buffer.concat([Buffer.from([s.length,s.length]),Buffer.from(s),Buffer.from([0])]));let offset=0;const offsets=chunks.map(c=>{const b=u32(offset);offset+=c.length;return b});const pool=Buffer.concat([u16(1),u16(28),u32(28+strings.length*4+offset),u32(strings.length),u32(0),u32(256),u32(28+strings.length*4),u32(0),...offsets,...chunks]);
+function tag(name,attrs){return Buffer.concat([u16(0x102),u16(16),u32(36+20*attrs.length),u32(1),u32(0xffffffff),u32(0xffffffff),u32(name),u16(20),u16(20),u16(attrs.length),u16(0),u16(0),u16(0),...attrs.map(([k,v])=>Buffer.concat([u32(0xffffffff),u32(k),u32(v),u16(8),Buffer.from([0,3]),u32(v)]))])}
+const manifestBody=Buffer.concat([pool,tag(0,[[1,2],[3,4]]),tag(5,[[6,7]])]);const manifest=Buffer.concat([u16(3),u16(8),u32(manifestBody.length+8),manifestBody]);
+assert.equal(parseManifest(manifest).package,'com.example.test');assert.deepEqual(parseManifest(manifest).permissions,['android.permission.CAMERA']);assert.throws(()=>parseManifest(new Uint8Array(12)));
+const scanner=(s,path)=>s.includes('EICAR')?[{rule:'EICAR',path}]:[];
+for(const method of [0,8]){const r=await inspectZip(zip('test.txt','EICAR',{method}),scanner);assert.equal(r.scanned,1);assert.equal(r.entries[0].findings.length,1)}
+for(const options of [{encrypted:true},{badCRC:true},{method:99}]){const r=await inspectZip(zip('test.txt','hello',options),scanner);assert.equal(r.skipped,1)}
+assert.equal((await inspectZip(zip('bomb.txt','x'.repeat(100000)),scanner)).skipped,1);
+const apk=await inspectZip(zip('AndroidManifest.xml',manifest),scanner);assert.equal(apk.apk.versionName,'1.0');
+assert.equal(category({findings:[],partial:true}),'partial');assert.deepEqual(counts([{report:{findings:[]}},{report:{findings:[{}]}},{state:'error'}]),{clear:1,findings:1,partial:1});
+let clock=0;const original=globalThis.performance;globalThis.performance={now:()=>clock};globalThis.document={hidden:false};const {AdaptiveScheduler}=await import('./scheduler.js');let starts=0;const sch=new AdaptiveScheduler(()=>starts++,()=>{},{cores:8,memory:8});sch.jobs.set('x',{rate:100});for(let i=0;i<8;i++){clock+=1000;sch.sample()}assert.equal(sch.limit,2);clock+=1400;sch.sample();assert.equal(sch.limit,1);sch.stop();globalThis.performance=original;
+console.log('PASS: ZIP stored/deflate, CRC errors, encryption, unsupported compression, expansion limits, valid binary APK manifest, categories and adaptive scheduler.');
