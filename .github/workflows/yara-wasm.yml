@@ -25,9 +25,9 @@ jobs:
           cd "$RUNNER_TEMP/yara"
           ./bootstrap.sh
           emconfigure ./configure --host=wasm32-unknown-emscripten --disable-shared --disable-crypto --without-crypto --disable-magic --disable-cuckoo --disable-dotnet
-          emmake make -j2
+          emmake make -j2 libyara.la
           mkdir -p "$GITHUB_WORKSPACE/vendor"
-          emcc "$GITHUB_WORKSPACE/native/yara-wrapper.c" libyara/.libs/libyara.a -Ilibyara/include -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker,node -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=134217728 -sFILESYSTEM=0 -sEXPORTED_FUNCTIONS='["_aw_scan","_aw_result","_malloc","_free"]' -sEXPORTED_RUNTIME_METHODS='["ccall","UTF8ToString"]' -o "$GITHUB_WORKSPACE/vendor/yara.js"
+          emcc "$GITHUB_WORKSPACE/native/yara-wrapper.c" .libs/libyara.a -Ilibyara/include -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker,node -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=134217728 -sFILESYSTEM=0 -sEXPORTED_FUNCTIONS='["_aw_scan","_aw_result","_malloc","_free"]' -sEXPORTED_RUNTIME_METHODS='["ccall","UTF8ToString"]' -o "$GITHUB_WORKSPACE/vendor/yara.js"
           cp COPYING "$GITHUB_WORKSPACE/vendor/YARA-LICENSE"
       - name: Smoke test
         run: node native/smoke.mjs
