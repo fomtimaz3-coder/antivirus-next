@@ -1,4 +1,4 @@
-# Anti-wiew 2.0.0
+# Anti-wiew 2.1.0
 
 Локальный статический сканер для браузера Android. Нет сервера обработки файлов. Не полноценный антивирус и не защита ОС.
 
@@ -8,7 +8,7 @@
 
 `node tests.mjs` и `node extended-tests.mjs`.
 
-Vercel: framework Other, без команды сборки, корень содержит index.html. Репозиторий mobile-desktop, ветка anti-wiew. Публикация через Vercel plugin в существующий проект; main остаётся прежним.
+Vercel: framework Other, без команды сборки, корень содержит index.html. Репозиторий antivirus-next, основная ветка main. Это самостоятельный проект: исходные файлы находятся в корне. Vercel пока использует существующий проект mobile-desktop; публикация выполняется отдельно через Vercel plugin.
 
 ## Возможности
 
