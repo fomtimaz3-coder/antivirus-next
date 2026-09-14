@@ -3,7 +3,7 @@ import {AdaptiveScheduler} from './scheduler.js';
 import {getRules,updateRules} from './rule-store.js';
 import {reputation,clearReputation} from './reputation.js';
 import {benchmark} from './benchmark.js';
-const VERSION='3.1.0',$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const VERSION='3.1.1',$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bytes=n=>{if(!n)return '0 Б';const k=Math.min(Math.floor(Math.log(n)/Math.log(1024)),4);return `${(n/1024**k).toLocaleString('ru-RU',{maximumFractionDigits:1})} ${['Б','КиБ','МиБ','ГиБ','ТиБ'][k]}`};
 let db,reports=[],database=[],queue=[],batch=[],currentReport,installPrompt,settings={theme:'auto',accent:'jade',density:'comfortable',retention:'0'},filter='all',search='',dateFilter='',canceling=false;
 function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').style.display='none',6000)}
