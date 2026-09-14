@@ -1,0 +1,11 @@
+// Static corpus regression; sample bytes never execute or leave this process.
+// Usage: node scripts/corpus-test.mjs /private/corpus.json /private/result.json
+import fs from 'node:fs/promises';import path from 'node:path';import {createHash} from 'node:crypto';import {scanNative} from './validate-rules.mjs';
+if(!process.argv[2]||!process.argv[3])throw Error('Provide a private corpus manifest and output report path');
+const manifestPath=path.resolve(process.argv[2]),cases=JSON.parse(await fs.readFile(manifestPath,'utf8'));if(!Array.isArray(cases)||cases.length>200)throw Error('Expected at most 200 explicit cases');
+const root=new URL('../',import.meta.url),pack=JSON.parse(await fs.readFile(new URL('rules/manifest.json',root),'utf8')),sources=[];
+for(const f of [...pack.files,...pack.shards||[]])sources.push({platform:f.platform,source:await fs.readFile(new URL(f.path,root),'utf8')});
+const results=[];
+for(const c of cases){if(!/^[a-f0-9]{64}$/.test(c.sha256)||!['benign','malware'].includes(c.label)||!Array.isArray(c.expectedRules)||!['win','elf','osx','other'].includes(c.platform))throw Error('Invalid corpus entry');const p=path.resolve(path.dirname(manifestPath),c.path),stat=await fs.stat(p);if(!stat.isFile()||stat.size>32*1024*1024){results.push({sha256:c.sha256,status:'skipped',reason:'32 MiB limit'});continue}const bytes=await fs.readFile(p),sha256=createHash('sha256').update(bytes).digest('hex');if(sha256!==c.sha256)throw Error('Corpus hash mismatch');const start=Date.now(),matches=new Set();for(const s of sources)if(!s.platform||s.platform===c.platform)for(const rule of await scanNative(bytes,s.source))matches.add(rule);const positive=matches.size>0,expected=c.expectedRules.every(r=>matches.has(r));results.push({sha256,label:c.label,matches:[...matches],expectedRulesMatched:expected,status:c.label==='benign'?(positive?'false_positive':'true_negative'):(positive&&expected?'true_positive':'miss'),durationMs:Date.now()-start})}
+const counts={};for(const r of results)counts[r.status]=(counts[r.status]||0)+1;
+await fs.writeFile(process.argv[3],JSON.stringify({ruleVersion:pack.version,created:new Date().toISOString(),execution:'static only',counts,results},null,2));console.log(JSON.stringify(counts));if(results.some(r=>['miss','false_positive'].includes(r.status)))process.exitCode=1;

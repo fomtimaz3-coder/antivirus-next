@@ -1,0 +1,33 @@
+name: Update public Malpedia rules
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+  push:
+    paths: ['scripts/update-rules.py', 'scripts/validate-rules.mjs', '.github/workflows/update-rules.yml']
+permissions:
+  contents: write
+concurrency:
+  group: public-rule-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 scripts/update-rules.py
+      - run: node scripts/validate-rules.mjs
+      - run: npm test
+      - name: Publish validated public rules
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rules/
+          git diff --cached --quiet && exit 0
+          git commit -m 'Update verified public Malpedia signature feed'
+          git pull --rebase origin main
+          git push origin HEAD:main

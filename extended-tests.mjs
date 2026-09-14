@@ -16,3 +16,8 @@ const apk=await inspectZip(zip('AndroidManifest.xml',manifest),scanner);assert.e
 assert.equal(category({findings:[],partial:true}),'partial');assert.deepEqual(counts([{report:{findings:[]}},{report:{findings:[{}]}},{state:'error'}]),{clear:1,findings:1,partial:1});
 let clock=0;const original=globalThis.performance;globalThis.performance={now:()=>clock};globalThis.document={hidden:false};const {AdaptiveScheduler}=await import('./scheduler.js');let starts=0;const sch=new AdaptiveScheduler(()=>starts++,()=>{},{cap:3});sch.jobs.set('x',{rate:100});for(let i=0;i<8;i++){clock+=1000;sch.sample()}assert.equal(sch.limit,2);clock+=1400;sch.sample();assert.equal(sch.limit,1);sch.stop();globalThis.performance=original;
 console.log('PASS: ZIP stored/deflate, CRC errors, encryption, unsupported compression, expansion limits, valid binary APK manifest, categories and adaptive scheduler.');
+const nested=await zip('outer.zip',Buffer.from(await zip('inner.zip',Buffer.from(await zip('leaf.txt','EICAR',{method:0}).arrayBuffer()),{method:0}).arrayBuffer()),{method:0});
+const tree=await inspectZip(nested,scanner);assert.equal(tree.entries[0].archive.entries[0].archive.entries[0].name,'leaf.txt');assert.equal(tree.treeBudget.entries,3);assert(tree.entries[0].findings.some(x=>x.path==='outer.zip / inner.zip / leaf.txt'));
+const tooDeep=zip('extra.zip',Buffer.from(await nested.arrayBuffer()),{method:0});assert.match((await inspectZip(tooDeep,scanner)).limitations.join(' '),/предел/);
+const budget={entries:499,bytes:0};const limited=await inspectZip(nested,scanner,()=>{},null,{depth:0,budget});assert.equal(budget.entries,500);assert(limited.limitations.length);
+console.log('PASS: recursive ZIP depth, nested finding paths and shared global limits.');

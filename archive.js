@@ -1,9 +1,10 @@
 import {SHA256} from './sha256.js';
-export const LIMITS={entries:500,entryBytes:32*1024*1024,totalBytes:128*1024*1024,ratio:200,manifestBytes:2*1024*1024};
+export const LIMITS={entries:500,entryBytes:32*1024*1024,totalBytes:128*1024*1024,ratio:200,manifestBytes:2*1024*1024,depth:2};
 const table=Uint32Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0});
 function crc(bytes,c=0xffffffff){for(const b of bytes)c=table[(c^b)&255]^(c>>>8);return c>>>0}
-export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=null){
- const result={entries:[],total:0,scanned:0,skipped:0,expandedBytes:0,limitations:[],apk:null};
+export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=null,context={depth:0,budget:{entries:0,bytes:0}}){
+ const {depth,budget}=context;
+ const result={depth,entries:[],total:0,scanned:0,skipped:0,expandedBytes:0,limitations:[],apk:null};
  const tailStart=Math.max(0,file.size-65557),tail=new Uint8Array(await file.slice(tailStart).arrayBuffer()),v=new DataView(tail.buffer);let end=-1;
  for(let p=tail.length-22;p>=0;p--)if(v.getUint32(p,true)===0x06054b50&&p+22+v.getUint16(p+20,true)===tail.length){end=p;break}
  if(end<0)throw Error('Не найден корректный каталог ZIP');
@@ -12,7 +13,8 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=n
  if(count===65535||size===0xffffffff||offset===0xffffffff)throw Error('ZIP64 не поддерживается');
  if(size>8*1024*1024||offset+size>tailStart+end)throw Error('Каталог ZIP повреждён или превышает 8 МиБ');
  const cat=new Uint8Array(await file.slice(offset,offset+size).arrayBuffer()),d=new DataView(cat.buffer);let p=0;
- for(let i=0;i<Math.min(count,LIMITS.entries);i++){
+ for(let i=0;i<count;i++){
+  if(budget.entries>=LIMITS.entries){result.skipped+=count-i;result.limitations.push('Общий лимит: 500 записей во всём дереве ZIP');break}budget.entries++;
   if(p+46>cat.length||d.getUint32(p,true)!==0x02014b50)throw Error('Повреждена запись каталога ZIP');
   const flags=d.getUint16(p+8,true),method=d.getUint16(p+10,true),checksum=d.getUint32(p+16,true),packed=d.getUint32(p+20,true),unpacked=d.getUint32(p+24,true),nl=d.getUint16(p+28,true),el=d.getUint16(p+30,true),cl=d.getUint16(p+32,true),local=d.getUint32(p+42,true);
   if(p+46+nl+el+cl>cat.length)throw Error('Повреждено имя записи ZIP');
@@ -22,7 +24,7 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=n
   try{
    if(flags&1)throw Error('Зашифрованный файл');
    if(![0,8].includes(method))throw Error('Неподдерживаемый метод сжатия '+method);
-   if(unpacked>LIMITS.entryBytes||packed>LIMITS.entryBytes||unpacked/Math.max(1,packed)>LIMITS.ratio||result.expandedBytes+unpacked>LIMITS.totalBytes)throw Error('Превышен лимит безопасной распаковки');
+   if(unpacked>LIMITS.entryBytes||packed>LIMITS.entryBytes||unpacked/Math.max(1,packed)>LIMITS.ratio||budget.bytes+unpacked>LIMITS.totalBytes)throw Error('Превышен лимит безопасной распаковки');
    const head=new DataView(await file.slice(local,local+30).arrayBuffer());
    if(head.byteLength!==30||head.getUint32(0,true)!==0x04034b50)throw Error('Повреждён локальный заголовок');
    if(head.getUint16(6,true)!==flags||head.getUint16(8,true)!==method||head.getUint16(26,true)!==nl)throw Error('Заголовки ZIP противоречат друг другу');
@@ -31,20 +33,22 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=n
    let stream=file.slice(start,start+packed).stream();if(method===8){try{stream=stream.pipeThrough(new DecompressionStream('deflate-raw'))}catch{throw Error('Браузер не поддерживает распаковку Deflate')}}
    const reader=stream.getReader(),hash=new SHA256();let actual=0,checksumActual=0xffffffff,tailText='',manifestParts=[];
    const isManifest=name==='AndroidManifest.xml',parts=[];
-   try{while(true){const {value,done}=await reader.read();if(done)break;actual+=value.length;result.expandedBytes+=value.length;
-    if(actual>LIMITS.entryBytes||actual>unpacked||result.expandedBytes>LIMITS.totalBytes)throw Error('Распаковка остановлена: превышен лимит');
-    if(inspectEntry)parts.push(value);hash.update(value);checksumActual=crc(value,checksumActual);const text=tailText+new TextDecoder('latin1').decode(value);entry.findings.push(...scanBytes(text,name));tailText=text.slice(-512);
+   try{while(true){const {value,done}=await reader.read();if(done)break;actual+=value.length;result.expandedBytes+=value.length;budget.bytes+=value.length;
+    if(actual>LIMITS.entryBytes||actual>unpacked||budget.bytes>LIMITS.totalBytes)throw Error('Распаковка остановлена: превышен лимит');
+    parts.push(value);hash.update(value);checksumActual=crc(value,checksumActual);const text=tailText+new TextDecoder('latin1').decode(value);entry.findings.push(...scanBytes(text,name));tailText=text.slice(-512);
     if(isManifest&&unpacked<=LIMITS.manifestBytes)manifestParts.push(value);
    }}finally{await reader.cancel().catch(()=>{})}
    if(actual!==unpacked||((checksumActual^0xffffffff)>>>0)!==checksum)throw Error('Размер или CRC-32 не совпадает');
-   entry.sha256=hash.digest();if(inspectEntry){const all=new Uint8Array(actual);let at=0;for(const part of parts){all.set(part,at);at+=part.length}const analysis=await inspectEntry(all,name);entry.analysis=analysis;entry.findings.push(...analysis.findings||[]);if(analysis.partial)result.limitations.push(name+': часть углублённого анализа пропущена');}entry.status='scanned';result.scanned++;
-   if(/\.(zip|apk|aab|jar|7z|rar|gz)$/i.test(name)){entry.reason='Вложенный архив: рекурсивная распаковка не выполнялась';result.limitations.push(name+': '+entry.reason)}
+   entry.sha256=hash.digest();const all=new Uint8Array(actual);let at=0;for(const part of parts){all.set(part,at);at+=part.length}parts.length=0;if(inspectEntry){const analysis=await inspectEntry(all,name);entry.analysis=analysis;entry.findings.push(...analysis.findings||[]);if(analysis.partial)result.limitations.push(name+': часть углублённого анализа пропущена');}entry.status='scanned';result.scanned++;
+   if(all[0]===0x50&&all[1]===0x4b){
+    if(depth>=LIMITS.depth){entry.reason='Достигнут предел: 2 вложенных уровня ZIP';result.limitations.push(name+': '+entry.reason)}
+    else{try{entry.archive=await inspectZip(new Blob([all]),scanBytes,onProgress,inspectEntry,{depth:depth+1,budget});for(const child of entry.archive.entries)for(const f of child.findings)entry.findings.push({...f,path:name+' / '+(f.path||child.name)});result.limitations.push(...entry.archive.limitations.map(x=>name+' / '+x));if(entry.archive.skipped)result.limitations.push(name+': пропущено вложенных записей '+entry.archive.skipped)}catch(e){entry.reason='Вложенный ZIP: '+e.message;result.limitations.push(name+': '+entry.reason)}}
+   }else if(/\.(7z|rar|gz)$/i.test(name)){entry.reason='Формат вложенного архива не поддерживается';result.limitations.push(name+': '+entry.reason)}
    if(isManifest){if(unpacked>LIMITS.manifestBytes)result.limitations.push('AndroidManifest.xml превышает 2 МиБ');else{const all=new Uint8Array(actual);let at=0;for(const part of manifestParts){all.set(part,at);at+=part.length}try{result.apk=parseManifest(all)}catch(e){result.limitations.push('Манифест APK: '+e.message)}}}
   }catch(e){entry.reason=e.message;result.skipped++}
-  entry.findings=[...new Map(entry.findings.map(f=>[f.rule,f])).values()];onProgress({archiveScanned:result.scanned,archiveTotal:result.total,archiveName:name});
+  entry.findings=[...new Map(entry.findings.map(f=>[f.rule+'|'+(f.path||name),f])).values()];onProgress({archiveScanned:result.scanned,archiveTotal:result.total,archiveName:name});
  }
- if(count>LIMITS.entries){result.skipped+=count-LIMITS.entries;result.limitations.push('Обработаны только первые 500 записей каталога')}
- return result;
+ result.treeBudget={...budget};return result;
 }
 export function parseManifest(bytes){
  const d=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),strings=[];const out={package:null,versionName:null,versionCode:null,minSdk:null,targetSdk:null,permissions:[]};
