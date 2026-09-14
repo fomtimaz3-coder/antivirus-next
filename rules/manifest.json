@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "version": "2026.09.14.1",
+  "engine": "YARA 4.5.8",
+  "published": "2026-09-14",
+  "description": "Стартовый набор: EICAR, WannaCry, Petya. Правила семейств 2016–2017 годов, не полная актуальная база угроз.",
+  "source": "https://github.com/Yara-Rules/rules",
+  "license": "GPL-2.0",
+  "files": [
+    {
+      "path": "rules/MALW_Eicar.yar",
+      "sha256": "1ba3175cebe28fc5d4d25c1caf604beda152766db268a3f159e4bf61c2eddf54"
+    },
+    {
+      "path": "rules/RANSOM_MS17-010_Wannacrypt.yar",
+      "sha256": "cc006c23ad6e012cbe37299a11c43fdd7d24d588ef4139cc6660e47e808013df"
+    },
+    {
+      "path": "rules/RANSOM_Petya.yar",
+      "sha256": "f6f6b241a676bfdfc595f4cc6ad74ec31dded405deb34490c82912807ee9dd78"
+    }
+  ],
+  "ruleCount": 8
+}

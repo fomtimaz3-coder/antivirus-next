@@ -2,7 +2,7 @@ import {SHA256} from './sha256.js';
 export const LIMITS={entries:500,entryBytes:32*1024*1024,totalBytes:128*1024*1024,ratio:200,manifestBytes:2*1024*1024};
 const table=Uint32Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0});
 function crc(bytes,c=0xffffffff){for(const b of bytes)c=table[(c^b)&255]^(c>>>8);return c>>>0}
-export async function inspectZip(file,scanBytes,onProgress=()=>{}){
+export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=null){
  const result={entries:[],total:0,scanned:0,skipped:0,expandedBytes:0,limitations:[],apk:null};
  const tailStart=Math.max(0,file.size-65557),tail=new Uint8Array(await file.slice(tailStart).arrayBuffer()),v=new DataView(tail.buffer);let end=-1;
  for(let p=tail.length-22;p>=0;p--)if(v.getUint32(p,true)===0x06054b50&&p+22+v.getUint16(p+20,true)===tail.length){end=p;break}
@@ -30,14 +30,14 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{}){
    const start=local+30+nl+head.getUint16(28,true);if(start+packed>offset)throw Error('Данные выходят за границы ZIP');
    let stream=file.slice(start,start+packed).stream();if(method===8){try{stream=stream.pipeThrough(new DecompressionStream('deflate-raw'))}catch{throw Error('Браузер не поддерживает распаковку Deflate')}}
    const reader=stream.getReader(),hash=new SHA256();let actual=0,checksumActual=0xffffffff,tailText='',manifestParts=[];
-   const isManifest=name==='AndroidManifest.xml';
+   const isManifest=name==='AndroidManifest.xml',parts=[];
    try{while(true){const {value,done}=await reader.read();if(done)break;actual+=value.length;result.expandedBytes+=value.length;
     if(actual>LIMITS.entryBytes||actual>unpacked||result.expandedBytes>LIMITS.totalBytes)throw Error('Распаковка остановлена: превышен лимит');
-    hash.update(value);checksumActual=crc(value,checksumActual);const text=tailText+new TextDecoder('latin1').decode(value);entry.findings.push(...scanBytes(text,name));tailText=text.slice(-512);
+    if(inspectEntry)parts.push(value);hash.update(value);checksumActual=crc(value,checksumActual);const text=tailText+new TextDecoder('latin1').decode(value);entry.findings.push(...scanBytes(text,name));tailText=text.slice(-512);
     if(isManifest&&unpacked<=LIMITS.manifestBytes)manifestParts.push(value);
    }}finally{await reader.cancel().catch(()=>{})}
    if(actual!==unpacked||((checksumActual^0xffffffff)>>>0)!==checksum)throw Error('Размер или CRC-32 не совпадает');
-   entry.sha256=hash.digest();entry.status='scanned';result.scanned++;
+   entry.sha256=hash.digest();if(inspectEntry){const all=new Uint8Array(actual);let at=0;for(const part of parts){all.set(part,at);at+=part.length}const analysis=await inspectEntry(all,name);entry.analysis=analysis;entry.findings.push(...analysis.findings||[]);if(analysis.partial)result.limitations.push(name+': часть углублённого анализа пропущена');}entry.status='scanned';result.scanned++;
    if(/\.(zip|apk|aab|jar|7z|rar|gz)$/i.test(name)){entry.reason='Вложенный архив: рекурсивная распаковка не выполнялась';result.limitations.push(name+': '+entry.reason)}
    if(isManifest){if(unpacked>LIMITS.manifestBytes)result.limitations.push('AndroidManifest.xml превышает 2 МиБ');else{const all=new Uint8Array(actual);let at=0;for(const part of manifestParts){all.set(part,at);at+=part.length}try{result.apk=parseManifest(all)}catch(e){result.limitations.push('Манифест APK: '+e.message)}}}
   }catch(e){entry.reason=e.message;result.skipped++}
