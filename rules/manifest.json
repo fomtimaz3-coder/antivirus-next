@@ -1,11 +1,10 @@
 {
-  "schema": 1,
-  "version": "2026.09.14.1",
+  "schema": 2,
+  "version": "mp-46e8a9698e9e",
+  "published": "2026-09-14T05:40:41.727329+00:00",
   "engine": "YARA 4.5.8",
-  "published": "2026-09-14",
-  "description": "Стартовый набор: EICAR, WannaCry, Petya. Правила семейств 2016–2017 годов, не полная актуальная база угроз.",
-  "source": "https://github.com/Yara-Rules/rules",
-  "license": "GPL-2.0",
+  "ruleCount": 1800,
+  "description": "8 стартовых правил + 1792 публичных правил Malpedia для Windows, ELF и macOS. Автогенерация по распакованным образцам; покрытие Android DEX не расширено.",
   "files": [
     {
       "path": "rules/MALW_Eicar.yar",
@@ -20,5 +19,183 @@
       "sha256": "f6f6b241a676bfdfc595f4cc6ad74ec31dded405deb34490c82912807ee9dd78"
     }
   ],
-  "ruleCount": 8
+  "shards": [
+    {
+      "path": "rules/malpedia-elf-000.yar",
+      "sha256": "fd3e961ab927de2e6aa86c0a7dd1e8741dead582c5d55d78dfd04159637133eb",
+      "platform": "elf",
+      "count": 9
+    },
+    {
+      "path": "rules/malpedia-osx-000.yar",
+      "sha256": "8c15825f910c43da49d8ad1438d78bc4d940a9fc2ec5d535b873e35f2c6426a8",
+      "platform": "osx",
+      "count": 23
+    },
+    {
+      "path": "rules/malpedia-win-000.yar",
+      "sha256": "022afb78545dad2a27770dad6b6c4fd5ff4f4fb07789c3209f3d2c72f12f40c7",
+      "platform": "win",
+      "count": 62
+    },
+    {
+      "path": "rules/malpedia-win-001.yar",
+      "sha256": "1b8a73cba02d481855a1922dd5f9f0ef8378d9430cc875804fb4549de8ef89d1",
+      "platform": "win",
+      "count": 68
+    },
+    {
+      "path": "rules/malpedia-win-002.yar",
+      "sha256": "b691be4dac3ce01e3d9385552c008280af706262d11761bc109a4109334731ff",
+      "platform": "win",
+      "count": 68
+    },
+    {
+      "path": "rules/malpedia-win-003.yar",
+      "sha256": "77aa763761300860ee50aefb21620b3425563d60e53e85a01e9276c4bb93b9d5",
+      "platform": "win",
+      "count": 72
+    },
+    {
+      "path": "rules/malpedia-win-004.yar",
+      "sha256": "9353cdab2bb3671e2e4ecd17ebdc8b20b2726b59cc59c8295a2ae67bfd846171",
+      "platform": "win",
+      "count": 60
+    },
+    {
+      "path": "rules/malpedia-win-005.yar",
+      "sha256": "9bff92efa4a09e32da993beef7159f34e9594700a45fa659dfa4ef041438a53d",
+      "platform": "win",
+      "count": 68
+    },
+    {
+      "path": "rules/malpedia-win-006.yar",
+      "sha256": "007db3f5fef26bb6537054f453924794fd7ad3fb42569d3ed60a01444c9eaa21",
+      "platform": "win",
+      "count": 57
+    },
+    {
+      "path": "rules/malpedia-win-007.yar",
+      "sha256": "b1fd32ee95863b39467b010d8504428aa11a9d3b0d9ae4088f695f3c0b5a3d7d",
+      "platform": "win",
+      "count": 66
+    },
+    {
+      "path": "rules/malpedia-win-008.yar",
+      "sha256": "fe5f5e09bc23732412cb187f0c2ce9cb8c744633057bc3fc375ebb874fd34025",
+      "platform": "win",
+      "count": 67
+    },
+    {
+      "path": "rules/malpedia-win-009.yar",
+      "sha256": "3bfbdf065b710f55394b17763e6c79b9140a9abb784e78dfd8d7e379d191dd10",
+      "platform": "win",
+      "count": 69
+    },
+    {
+      "path": "rules/malpedia-win-010.yar",
+      "sha256": "7f2c4eda9a724caea148e9c18cb2f2bc16fd37e19a2c5e0fbafff7172d69f664",
+      "platform": "win",
+      "count": 58
+    },
+    {
+      "path": "rules/malpedia-win-011.yar",
+      "sha256": "b9535624149fe7d98b99053819193f7454b44468bab37a0fbd1fe41020164b21",
+      "platform": "win",
+      "count": 63
+    },
+    {
+      "path": "rules/malpedia-win-012.yar",
+      "sha256": "0c3be5e11d1d1381a950bd644b05888c498b6af9b8419177f2b3f475e4b16553",
+      "platform": "win",
+      "count": 71
+    },
+    {
+      "path": "rules/malpedia-win-013.yar",
+      "sha256": "9989728aaa65b65fa771248376a192be529c2a843b662d805f7f402b56eea116",
+      "platform": "win",
+      "count": 70
+    },
+    {
+      "path": "rules/malpedia-win-014.yar",
+      "sha256": "2948afb8e92ab5b7203ef9d74e89732f5428a77b85fe463b914e101cbf6f4a98",
+      "platform": "win",
+      "count": 71
+    },
+    {
+      "path": "rules/malpedia-win-015.yar",
+      "sha256": "92690198d350d633d919f9deb7e8579193efbb00a108827fbe10c4fabfd11959",
+      "platform": "win",
+      "count": 67
+    },
+    {
+      "path": "rules/malpedia-win-016.yar",
+      "sha256": "bb574ad502e9296e18b374ff6bf1a78727e630f262e7e8b5fb7c42142bc48a27",
+      "platform": "win",
+      "count": 69
+    },
+    {
+      "path": "rules/malpedia-win-017.yar",
+      "sha256": "448febfeaa40940a8895077bfe741063dd15e9b4ac4fc8f310d7294e036d1f0c",
+      "platform": "win",
+      "count": 64
+    },
+    {
+      "path": "rules/malpedia-win-018.yar",
+      "sha256": "dac195323aa7beeb7528fa7bd97d579af83ec1a2aeca0af2f78b8ee023742002",
+      "platform": "win",
+      "count": 65
+    },
+    {
+      "path": "rules/malpedia-win-019.yar",
+      "sha256": "7c3fcca514f74e7ed90aa590637ceee18cd946cbf1b871e8697b6f8754fcc6c0",
+      "platform": "win",
+      "count": 64
+    },
+    {
+      "path": "rules/malpedia-win-020.yar",
+      "sha256": "0672b675244d3b8fdd7a91e0b9a9f79900d6a6f975d020e353d9fc3513a81f69",
+      "platform": "win",
+      "count": 63
+    },
+    {
+      "path": "rules/malpedia-win-021.yar",
+      "sha256": "59e66df4fe983bec8b6bd9983b0c2f4e32f2c6986a216ef21649f32000e6c38f",
+      "platform": "win",
+      "count": 65
+    },
+    {
+      "path": "rules/malpedia-win-022.yar",
+      "sha256": "cc5ef475872174667fa5c9c6a44102b49aff0dcd802486f83b0c26f1f36e8ede",
+      "platform": "win",
+      "count": 68
+    },
+    {
+      "path": "rules/malpedia-win-023.yar",
+      "sha256": "fe64aa38b80123fa03794491d089a4fc569ca99f0fe7d6d599d51664cad8ca32",
+      "platform": "win",
+      "count": 69
+    },
+    {
+      "path": "rules/malpedia-win-024.yar",
+      "sha256": "268cc8c99bc33f88896c393b45e3f0a176dc4f319ae193ff45b77b627174a31f",
+      "platform": "win",
+      "count": 66
+    },
+    {
+      "path": "rules/malpedia-win-025.yar",
+      "sha256": "aff6c3f6f114b568b1ef6567d145003406de0d5b79025372864c6b90e88a0646",
+      "platform": "win",
+      "count": 69
+    },
+    {
+      "path": "rules/malpedia-win-026.yar",
+      "sha256": "e821c4e442ef20a450f60977d9cfcea29b92c13a5aae1f9c34fb616ff49f4eae",
+      "platform": "win",
+      "count": 41
+    }
+  ],
+  "feed": "https://malpedia.caad.fkie.fraunhofer.de/api/get/yara/auto/zip",
+  "license": "Malpedia CC BY-SA 4.0; starter GPL-2.0",
+  "skippedCount": 0
 }
