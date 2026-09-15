@@ -4,7 +4,7 @@ export async function scanWithRules(file,pack){
  const base=await yaraScan(file,pack?.source);if(base.error)return base;
  const bytes=new Uint8Array(await file.slice(0,4).arrayBuffer());const magic=bytes.length===4?new DataView(bytes.buffer).getUint32(0):0;
  const platform=bytes[0]===77&&bytes[1]===90?'win':magic===0x7f454c46?'elf':[0xfeedface,0xfeedfacf,0xcefaedfe,0xcffaedfe,0xcafebabe,0xbebafeca,0xcafebabf,0xbfbafeca].includes(magic)?'osx':null;
- const shards=(pack?.manifest?.shards||[]).filter(s=>s.platform===platform),matches=new Set(base.matches),errors=[];let checked=0;const started=performance.now();const {getShard}=await import('./rule-store.js');
- for(const shard of shards){if(performance.now()-started>60000){errors.push('Лимит общего времени Malpedia: оставшиеся части базы пропущены');break}try{const source=await getShard(pack,shard),result=await yaraScan(file,source);if(result.error)errors.push(result.error);else{checked++;for(const m of result.matches)matches.add(m)}}catch(e){errors.push(e.message)}}
- return {...base,matches:[...matches],platform,shardsChecked:checked,shardsSelected:shards.length,ruleVersion:pack?.manifest?.version,...(errors.length?{error:[...new Set(errors)].join('; ')}:{})};
+ const shards=(pack?.manifest?.shards||[]).filter(s=>s.platform===platform),matches=new Set(base.matches),errors=[];let checked=0,extraRulesChecked=0;const started=performance.now();const {getShard}=await import('./rule-store.js');
+ for(const shard of shards){if(performance.now()-started>60000){errors.push('Лимит общего времени Malpedia: оставшиеся части базы пропущены');break}try{const source=await getShard(pack,shard),result=await yaraScan(file,source);if(result.error)errors.push(result.error);else{checked++;extraRulesChecked+=shard.count||0;for(const m of result.matches)matches.add(m)}}catch(e){errors.push(e.message)}}
+ return {...base,matches:[...matches],platform,baseRulesChecked:pack?.source?.match(/(?:^|\n)\s*(?:(?:private|global)\s+)*rule\s+\w+/g)?.length||0,extraRulesChecked,shardsChecked:checked,shardsSelected:shards.length,ruleVersion:pack?.manifest?.version,...(errors.length?{error:[...new Set(errors)].join('; ')}:{})};
 }

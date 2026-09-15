@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {category,coverageReasons} from './ui-logic.js';
+import {renderReport} from './report-view.js';
+const r={name:'source.zip',created:new Date().toISOString(),findings:[],limitations:[],analysis:{format:'other'},archive:{scanned:1,entries:[{name:'test.kt',status:'scanned',analysis:{format:'other',findings:[]}}]},reputation:{attempts:[{provider:'VirusTotal',status:'unavailable',reason:'Авторизация'},{provider:'MalwareBazaar',status:'unknown'}]}};
+assert.equal(category(r),'partial');assert.equal(coverageReasons(r).length,2);
+assert.equal(category({...r,findings:[{title:'test'}]}),'findings');
+const html=renderReport(r);assert.match(html,/Проверка ограничена/);assert.match(html,/MalwareBazaar/);assert.match(html,/report-entry/);assert.ok(!html.includes('<pre>'));assert.match(html,/Не записано|сведений о выполнении нет/);
+assert.ok(!renderReport({...r,name:'<img onerror=x>'}).includes('<img'));
+assert.equal(category({findings:[],analysis:{format:'PE',details:{format:'PE'}}}),'clear');
+console.log('PASS: source ZIP coverage, provider failure, findings priority, legacy report, compact escaped rendering.');
