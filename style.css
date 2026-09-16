@@ -50,3 +50,9 @@ nav button.active,body.light nav button.active{background:color-mix(in srgb,var(
 .report-row{border-left:4px solid var(--muted)}.report-row.result-clear{border-left-color:#52aa7a}.report-row.result-partial{border-left-color:#d8ae42}.report-row.result-findings{border-left-color:#e66c72}.status.findings{color:#ef9999}.light .status.findings{color:#a33b3b}
 @media(max-width:650px){.theme-segments button{width:32px;min-width:32px;height:32px}.scan-toolbar h1{font-size:23px}#scanProgress{width:160px;height:160px;min-height:160px}.overview>div{padding-left:6px;padding-right:6px}.advanced-settings{padding:14px}}
 @media(prefers-reduced-motion:reduce){#progressArc{transition:none}}
+
+/* 3.2.1 — requested checkbox and destructive action details. */
+#vtEnabled:checked:after{border-color:#fff}
+.destructive-action{display:inline-block;border:1px solid currentColor;border-radius:12px;padding:10px 14px;margin:16px 8px 0 0;color:#ef9999;background:transparent}
+.light .destructive-action{color:#a33b3b}
+.report-row{border-top-left-radius:0;border-bottom-left-radius:0}
