@@ -3,7 +3,7 @@ import {inspectContainer,containerType} from './containers.js';
 import {VERSION} from './build-info.js';
 import {SHA256} from './sha256.js';
 import {hashIndex} from './bloom.js';
-import {scanWithRules} from './yara.js';
+import {scanWithRules,disposeYara} from './yara.js';
 import {staticAnalysis} from './static-analysis.js';
 const CHUNK=2*1024*1024,STATIC_LIMIT=32*1024*1024;
 let cloudResolve;
@@ -11,7 +11,8 @@ self.onmessage=async({data})=>{
  if(data.kind==='reputation'){cloudResolve?.(data.value);cloudResolve=null;return}
  const {file,id,database=[],rulePack,cloud=false}=data,start=performance.now(),hash=new SHA256(),found=[],limitations=[],log=[],index=hashIndex(database);let done=0,last=0,archive=null,analysis=null,yara=null,reputation={status:'disabled'};
  const progress=(phase,extra={})=>self.postMessage({kind:'progress',id,done,phase,seconds:(performance.now()-start)/1000,...extra});
- const inspect=async(b,name,sha256)=>{const result=staticAnalysis(b,name),y=await scanWithRules(new Blob([b]),rulePack);result.yara=y;const hit=index.find(sha256);if(hit)result.findings.push({rule:'HASH-DB-INNER',title:hit.name,kind:'hash'});if(y.error){result.partial=true;result.limitations.push(y.error)}for(const rule of y.matches||[])result.findings.push({rule,title:rule==='eicar'?'Обнаружен безвредный тест EICAR':'Совпадение YARA: '+rule,kind:rule==='eicar'?'test':'yara'});return result};
+ const yaraCache=new Map();let cacheHits=0;
+ const inspect=async(b,name,sha256)=>{const result=staticAnalysis(b,name);let y=yaraCache.get(sha256);if(y){cacheHits++}else{y=await scanWithRules(new Blob([b]),rulePack);if(sha256&&!y.error){if(yaraCache.size>=128)yaraCache.delete(yaraCache.keys().next().value);yaraCache.set(sha256,y)}}result.yara=y;const hit=index.find(sha256);if(hit)result.findings.push({rule:'HASH-DB-INNER',title:hit.name,kind:'hash'});if(y.error){result.partial=true;result.limitations.push(y.error)}for(const rule of y.matches||[])result.findings.push({rule,title:rule==='eicar'?'Обнаружен безвредный тест EICAR':'Совпадение YARA: '+rule,kind:rule==='eicar'?'test':'yara'});return result};
  try{
  for(let at=0;at<file.size;at+=CHUNK){const bytes=new Uint8Array(await file.slice(at,at+CHUNK).arrayBuffer());hash.update(bytes);done+=bytes.length;if(performance.now()-last>120||done===file.size){progress('hash');last=performance.now()}}
  const sha256=hash.digest();log.push('SHA-256 вычислен потоково по всем байтам файла');const hit=index.find(sha256);if(hit)found.push({rule:'HASH-DB',title:hit.name,kind:'hash'});log.push('Bloom-фильтр + точное сопоставление с импортированной базой; отрицание не отменяет анализ');
@@ -27,6 +28,6 @@ self.onmessage=async({data})=>{
  limitations.push(rulePack?.manifest?.description||'База YARA недоступна.','Статический анализ не доказывает безопасность и не проверяет поведение файла.');
  const coverageIssues=coverageReasons({name:file.name,analysis,archive,reputation});limitations.push(...coverageIssues);
  const partial=coverageIssues.length>0||limitations.some(x=>/пока не реализован|не распаковано/.test(x))||!!yara.error||!!analysis?.partial||file.size>STATIC_LIMIT||!!archive&&(!!archive.error||archive.skipped>0||archive.limitations.length>0);
- self.postMessage({kind:'done',id,report:{id,name:file.name,size:file.size,mime:file.type||'Не указан',type,sha256,created:new Date().toISOString(),durationMs:Math.round(performance.now()-start),bytesRead:done,engine:'YARA 4.5.8 / AW '+VERSION,ruleVersion:rulePack?.manifest?.version||null,ruleDescription:rulePack?.manifest?.description||'База недоступна',databaseEntries:database.length,yara,reputation,analysis,archive,apk:archive?.apk||null,partial,findings:found,limitations:[...new Set(limitations)],status:found.length?'Есть находки':'Совпадений не найдено',coverage:partial?'Ограниченная проверка':'Статический анализ',log:[...log,'YARA: '+(yara.error||'проверка завершена'),'Структурный анализ: '+(analysis?.details?.format||'специализированный разбор внешнего файла не выполнен')]}});
- }catch(e){self.postMessage({kind:'error',id,error:String(e.message||e),done})}
+ self.postMessage({kind:'done',id,report:{id,name:file.name,size:file.size,mime:file.type||'Не указан',type,sha256,created:new Date().toISOString(),durationMs:Math.round(performance.now()-start),bytesRead:done,engine:'YARA 4.5.8 / AW '+VERSION,ruleVersion:rulePack?.manifest?.version||null,ruleDescription:rulePack?.manifest?.description||'База недоступна',databaseEntries:database.length,yara,reputation,analysis,archive,apk:archive?.apk||null,partial,findings:found,limitations:[...new Set(limitations)],status:found.length?'Есть находки':'Совпадений не найдено',coverage:partial?'Ограниченная проверка':'Статический анализ',log:[...log,'Повторно использованы результаты YARA для одинаковых SHA-256: '+cacheHits,'YARA: '+(yara.error||'проверка завершена'),'Структурный анализ: '+(analysis?.details?.format||'специализированный разбор внешнего файла не выполнен')]}});
+ }catch(e){self.postMessage({kind:'error',id,error:String(e.message||e),done})}finally{disposeYara();yaraCache.clear()}
 };
