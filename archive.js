@@ -1,3 +1,4 @@
+import {inspectNested} from './containers.js';
 import {SHA256} from './sha256.js';
 export const LIMITS={entries:500,entryBytes:32*1024*1024,totalBytes:128*1024*1024,ratio:200,manifestBytes:2*1024*1024,depth:2};
 const table=Uint32Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0});
@@ -13,7 +14,7 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=n
  if(count===65535||size===0xffffffff||offset===0xffffffff)throw Error('ZIP64 не поддерживается');
  if(size>8*1024*1024||offset+size>tailStart+end)throw Error('Каталог ZIP повреждён или превышает 8 МиБ');
  const cat=new Uint8Array(await file.slice(offset,offset+size).arrayBuffer()),d=new DataView(cat.buffer);let p=0;
- for(let i=0;i<count;i++){
+ try{for(let i=0;i<count;i++){
   if(budget.entries>=LIMITS.entries){result.skipped+=count-i;result.limitations.push('Общий лимит: 500 записей во всём дереве ZIP');break}budget.entries++;
   if(p+46>cat.length||d.getUint32(p,true)!==0x02014b50)throw Error('Повреждена запись каталога ZIP');
   const flags=d.getUint16(p+8,true),method=d.getUint16(p+10,true),checksum=d.getUint32(p+16,true),packed=d.getUint32(p+20,true),unpacked=d.getUint32(p+24,true),nl=d.getUint16(p+28,true),el=d.getUint16(p+30,true),cl=d.getUint16(p+32,true),local=d.getUint32(p+42,true);
@@ -39,15 +40,14 @@ export async function inspectZip(file,scanBytes,onProgress=()=>{},inspectEntry=n
     if(isManifest&&unpacked<=LIMITS.manifestBytes)manifestParts.push(value);
    }}finally{await reader.cancel().catch(()=>{})}
    if(actual!==unpacked||((checksumActual^0xffffffff)>>>0)!==checksum)throw Error('Размер или CRC-32 не совпадает');
-   entry.sha256=hash.digest();const all=new Uint8Array(actual);let at=0;for(const part of parts){all.set(part,at);at+=part.length}parts.length=0;if(inspectEntry){const analysis=await inspectEntry(all,name);entry.analysis=analysis;entry.findings.push(...analysis.findings||[]);if(analysis.partial)result.limitations.push(name+': часть углублённого анализа пропущена');}entry.status='scanned';result.scanned++;
-   if(all[0]===0x50&&all[1]===0x4b){
-    if(depth>=LIMITS.depth){entry.reason='Достигнут предел: 2 вложенных уровня ZIP';result.limitations.push(name+': '+entry.reason)}
-    else{try{entry.archive=await inspectZip(new Blob([all]),scanBytes,onProgress,inspectEntry,{depth:depth+1,budget});for(const child of entry.archive.entries)for(const f of child.findings)entry.findings.push({...f,path:name+' / '+(f.path||child.name)});result.limitations.push(...entry.archive.limitations.map(x=>name+' / '+x));if(entry.archive.skipped)result.limitations.push(name+': пропущено вложенных записей '+entry.archive.skipped)}catch(e){entry.reason='Вложенный ZIP: '+e.message;result.limitations.push(name+': '+entry.reason)}}
-   }else if(/\.(7z|rar|gz)$/i.test(name)){entry.reason='Формат вложенного архива не поддерживается';result.limitations.push(name+': '+entry.reason)}
+   entry.sha256=hash.digest();const all=new Uint8Array(actual);let at=0;for(const part of parts){all.set(part,at);at+=part.length}parts.length=0;if(inspectEntry){const analysis=await inspectEntry(all,name,entry.sha256);entry.analysis=analysis;entry.findings.push(...analysis.findings||[]);if(analysis.partial)result.limitations.push(name+': часть углублённого анализа пропущена');}entry.status='scanned';result.scanned++;
+   await inspectNested(entry,all,scanBytes,onProgress,inspectEntry,context,result);
+   if(/\.(7z|rar)$/i.test(name)){entry.reason='Формат вложенного архива не поддерживается';result.limitations.push(name+': '+entry.reason)}
    if(isManifest){if(unpacked>LIMITS.manifestBytes)result.limitations.push('AndroidManifest.xml превышает 2 МиБ');else{const all=new Uint8Array(actual);let at=0;for(const part of manifestParts){all.set(part,at);at+=part.length}try{result.apk=parseManifest(all)}catch(e){result.limitations.push('Манифест APK: '+e.message)}}}
   }catch(e){entry.reason=e.message;result.skipped++}
   entry.findings=[...new Map(entry.findings.map(f=>[f.rule+'|'+(f.path||name),f])).values()];onProgress({archiveScanned:result.scanned,archiveTotal:result.total,archiveName:name});
  }
+ }catch(e){result.error=e.message;result.limitations.push(e.message);result.skipped+=Math.max(1,count-result.entries.length)}
  result.treeBudget={...budget};return result;
 }
 export function parseManifest(bytes){
